@@ -66,8 +66,9 @@ export const OneDriveSettingsModal: React.FC<OneDriveSettingsModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     const effectiveMode =
-      status.targetFolder?.mode ||
-      (savedShareUrl || status.sharedFolderHint ? 'shared' : 'personal');
+      status.sharedFolderError || status.sharedFolderHint || savedShareUrl
+        ? 'shared'
+        : status.targetFolder?.mode || 'personal';
     setFolderMode(effectiveMode);
     setShareUrlInput(
       status.targetFolder?.shareUrl ||
@@ -82,6 +83,7 @@ export const OneDriveSettingsModal: React.FC<OneDriveSettingsModalProps> = ({
     status.targetFolder?.mode,
     status.targetFolder?.shareUrl,
     status.sharedFolderHint,
+    status.sharedFolderError,
     savedShareUrl,
   ]);
 
@@ -273,6 +275,16 @@ export const OneDriveSettingsModal: React.FC<OneDriveSettingsModalProps> = ({
                 <LogOut className="w-3.5 h-3.5" />
                 <span>Keluar Akun</span>
               </button>
+            </div>
+          )}
+
+          {/* Tampilkan error auto-connect folder bersama jika ada */}
+          {status.connected && status.sharedFolderError && (
+            <div className="border border-red-300 bg-red-50 rounded-md p-3.5 text-xs text-red-900 space-y-1">
+              <p className="font-bold">
+                Gagal Menghubungkan Otomatis ke Folder Bersama Tim QC
+              </p>
+              <p>{status.sharedFolderError}</p>
             </div>
           )}
 

@@ -96,7 +96,7 @@ async function parseJsonSafely<T>(
     const detail = htmlTitle ? ` (${htmlTitle})` : '';
     if (resp.status === 401 || resp.status === 403) {
       throw new Error(
-        `Sesi browser/server atau keamanan proxy menolak permintaan (HTTP ${resp.status}${detail}). Silakan refresh halaman (F5), lalu hubungkan ulang OneDrive.`
+        `Proxy browser/pratinjau menolak permintaan (HTTP ${resp.status}${detail}). Jika membuka dari pratinjau AI Studio, buka aplikasi di Tab Baru (ikon panah keluar), lalu refresh (F5) dan hubungkan ulang OneDrive.`
       );
     }
     if (resp.status >= 500) {
