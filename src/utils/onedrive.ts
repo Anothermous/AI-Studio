@@ -76,15 +76,55 @@ function buildHeaders(isMutation = false, hasJsonBody = false): HeadersInit {
   return headers;
 }
 
+async function parseJsonSafely<T>(
+  resp: Response,
+  fallbackError: string
+): Promise<T> {
+  const text = await resp.text();
+  if (!text) {
+    if (!resp.ok) {
+      throw new Error(`${fallbackError} (HTTP ${resp.status})`);
+    }
+    return {} as T;
+  }
+
+  const trimmed = text.trim();
+  if (trimmed.startsWith('<')) {
+    if (resp.status === 401 || resp.status === 403) {
+      throw new Error(
+        'Sesi browser/server perlu dimuat ulang. Silakan refresh halaman (F5), lalu hubungkan ulang OneDrive.'
+      );
+    }
+    if (resp.status >= 500) {
+      throw new Error(
+        `Server sedang memuat ulang atau sibuk (HTTP ${resp.status}). Tunggu beberapa detik lalu coba lagi.`
+      );
+    }
+    throw new Error(
+      `Respon server bukan JSON (HTTP ${resp.status}). Silakan refresh halaman (F5) lalu coba lagi.`
+    );
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(fallbackError);
+  }
+}
+
 export async function fetchOneDriveStatus(): Promise<OneDriveStatus> {
   const resp = await fetch('/api/auth/microsoft/status', {
     credentials: 'include',
     headers: buildHeaders(false, false),
   });
+  const data = await parseJsonSafely<OneDriveStatus & { error?: string }>(
+    resp,
+    'Gagal memeriksa status koneksi OneDrive.'
+  );
   if (!resp.ok) {
-    throw new Error('Gagal memeriksa status koneksi OneDrive.');
+    throw new Error(data.error || 'Gagal memeriksa status koneksi OneDrive.');
   }
-  return (await resp.json()) as OneDriveStatus;
+  return data;
 }
 
 export async function getMicrosoftAuthUrl(): Promise<string> {
@@ -92,7 +132,10 @@ export async function getMicrosoftAuthUrl(): Promise<string> {
     credentials: 'include',
     headers: buildHeaders(false, false),
   });
-  const data = (await resp.json()) as { url?: string; error?: string };
+  const data = await parseJsonSafely<{ url?: string; error?: string }>(
+    resp,
+    'Gagal membuat URL login Microsoft.'
+  );
   if (!resp.ok || !data.url) {
     throw new Error(data.error || 'Gagal membuat URL login Microsoft.');
   }
@@ -113,10 +156,10 @@ export async function fetchSharedOneDriveFolders(): Promise<SharedFolderItem[]> 
     credentials: 'include',
     headers: buildHeaders(false, false),
   });
-  const data = (await resp.json()) as {
+  const data = await parseJsonSafely<{
     folders?: SharedFolderItem[];
     error?: string;
-  };
+  }>(resp, 'Gagal mengambil daftar folder bersama OneDrive.');
   if (!resp.ok) {
     throw new Error(data.error || 'Gagal mengambil daftar folder bersama OneDrive.');
   }
@@ -141,10 +184,10 @@ export async function setOneDriveTargetFolder(
     headers: buildHeaders(true, true),
     body: JSON.stringify(payload),
   });
-  const data = (await resp.json()) as {
+  const data = await parseJsonSafely<{
     targetFolder?: OneDriveFolderConfig;
     error?: string;
-  };
+  }>(resp, 'Gagal mengatur folder tujuan OneDrive.');
   if (!resp.ok || !data.targetFolder) {
     throw new Error(data.error || 'Gagal mengatur folder tujuan OneDrive.');
   }
@@ -159,11 +202,11 @@ export async function fetchOneDriveRecords(): Promise<{
     credentials: 'include',
     headers: buildHeaders(false, false),
   });
-  const data = (await resp.json()) as {
+  const data = await parseJsonSafely<{
     records?: QCInspectionRecord[];
     targetFolder?: OneDriveFolderConfig | null;
     error?: string;
-  };
+  }>(resp, 'Gagal mengambil data QC dari OneDrive.');
   if (!resp.ok) {
     throw new Error(data.error || 'Gagal mengambil data QC dari OneDrive.');
   }
@@ -182,10 +225,10 @@ export async function saveRecordToOneDrive(
     headers: buildHeaders(true, true),
     body: JSON.stringify(record),
   });
-  const data = (await resp.json()) as {
+  const data = await parseJsonSafely<{
     record?: QCInspectionRecord;
     error?: string;
-  };
+  }>(resp, 'Gagal menyimpan data QC ke OneDrive.');
   if (!resp.ok || !data.record) {
     throw new Error(data.error || 'Gagal menyimpan data QC ke OneDrive.');
   }
@@ -198,7 +241,10 @@ export async function deleteRecordFromOneDrive(id: string): Promise<void> {
     credentials: 'include',
     headers: buildHeaders(true, false),
   });
-  const data = (await resp.json()) as { ok?: boolean; error?: string };
+  const data = await parseJsonSafely<{ ok?: boolean; error?: string }>(
+    resp,
+    'Gagal menghapus data QC dari OneDrive.'
+  );
   if (!resp.ok) {
     throw new Error(data.error || 'Gagal menghapus data QC dari OneDrive.');
   }

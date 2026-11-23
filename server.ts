@@ -163,12 +163,20 @@ async function getValidAccessToken(session: SessionData): Promise<string> {
     }
   );
 
-  const tokenData = (await tokenResp.json()) as {
+  const tokenText = await tokenResp.text();
+  let tokenData: {
     access_token?: string;
     refresh_token?: string;
     expires_in?: number;
     error_description?: string;
-  };
+  } = {};
+  try {
+    tokenData = JSON.parse(tokenText) as typeof tokenData;
+  } catch {
+    throw new Error(
+      `Respon token Microsoft tidak valid (HTTP ${tokenResp.status}). Silakan login ulang OneDrive.`
+    );
+  }
 
   if (!tokenResp.ok || !tokenData.access_token) {
     sessions.delete(session.id);
@@ -262,23 +270,29 @@ async function graphJson<T>(
     },
   });
 
+  const text = await resp.text();
   if (!resp.ok) {
-    const text = await resp.text();
     let msg = `Microsoft Graph error (${resp.status})`;
     try {
       const parsed = JSON.parse(text) as { error?: { message?: string } };
       if (parsed.error?.message) msg = parsed.error.message;
     } catch {
-      if (text) msg = text.slice(0, 200);
+      if (text) msg = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
     }
     throw new Error(msg);
   }
 
-  if (resp.status === 204) {
+  if (resp.status === 204 || !text) {
     return {} as T;
   }
 
-  return (await resp.json()) as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(
+      `Respon Microsoft Graph bukan JSON yang valid (HTTP ${resp.status}).`
+    );
+  }
 }
 
 async function ensureRootFolder(
@@ -1248,6 +1262,17 @@ async function startServer() {
         error: err instanceof Error ? err.message : 'Gagal menghapus data dari OneDrive.',
       });
     }
+  });
+
+  // Pastikan seluruh endpoint /api/* selalu mengembalikan JSON (tidak pernah jatuh ke HTML Vite/SPA)
+  app.use('/api', (_req, res) => {
+    res.status(404).json({ error: 'Endpoint API tidak ditemukan.' });
+  });
+
+  app.use('/api', (err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    const msg =
+      err instanceof Error ? err.message : 'Terjadi kesalahan internal pada server API.';
+    res.status(500).json({ error: msg });
   });
 
   // Vite dev middleware or static dist serving
