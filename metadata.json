@@ -1,0 +1,6 @@
+{
+  "name": "Finish Good QC - Solar Water Heater",
+  "description": "Aplikasi Quality Control Finish Good Tangki Solar Water Heater (WIE-QES-PR-QC-01/01) dengan verifikasi barcode ganda dan cetak bukti kelengkapan produk.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
