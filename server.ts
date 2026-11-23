@@ -152,7 +152,7 @@ async function getValidAccessToken(session: SessionData): Promise<string> {
     client_secret: clientSecret,
     grant_type: 'refresh_token',
     refresh_token: session.refreshToken,
-    scope: 'offline_access User.Read Files.ReadWrite',
+    scope: 'offline_access User.Read Files.ReadWrite.All',
   });
 
   const tokenResp = await fetch(
@@ -513,7 +513,7 @@ async function bindSharedFolderToSession(
       const msg = shareErr instanceof Error ? shareErr.message : '';
       if (/access\s*denied|forbidden|permission|unauthorized/i.test(msg)) {
         throw new Error(
-          `Akses lintas akun OneDrive ditolak oleh Microsoft (${msg}). Kebijakan organisasi memerlukan persetujuan Admin IT untuk izin Files.ReadWrite.All jika memakai 2 akun Microsoft berbeda. Solusi langsung tanpa Admin IT: login OneDrive memakai 1 akun bersama (misal akun pemilik folder), lalu pilih nama QC masing-masing pada form inspeksi.`
+          `Akses folder bersama ditolak untuk akun ${session.user.email} (${msg}). Pastikan pemilik folder sudah melakukan Share langsung ke akun ${session.user.email} dengan izin "Dapat Mengedit / Can Edit" (bukan hanya "Dapat Melihat").`
         );
       }
       throw shareErr;
@@ -653,7 +653,7 @@ async function startServer() {
       response_type: 'code',
       redirect_uri: getRedirectUri(req),
       response_mode: 'query',
-      scope: 'offline_access User.Read Files.ReadWrite',
+      scope: 'offline_access User.Read Files.ReadWrite.All',
       state,
       prompt: 'select_account',
     });
@@ -716,7 +716,7 @@ async function startServer() {
         grant_type: 'authorization_code',
         code,
         redirect_uri: getRedirectUri(req),
-        scope: 'offline_access User.Read Files.ReadWrite',
+        scope: 'offline_access User.Read Files.ReadWrite.All',
       });
 
       const tokenResp = await fetch(
