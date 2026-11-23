@@ -181,22 +181,28 @@ export const PrintableQcSheet: React.FC<PrintableQcSheetProps> = ({ records }) =
 
             {/* Footer Tanda Tangan / Paraf */}
             <footer className="pt-4 mt-2 border-t border-slate-300 grid grid-cols-3 gap-6 text-xs text-slate-700">
-              <div>
-                <p className="text-slate-500 mb-8">Diperiksa Oleh (Quality Control)</p>
-                <p className="font-semibold text-slate-900 border-t border-slate-400 pt-1">
+              <div className="flex flex-col justify-between min-h-[88px]">
+                <p className="text-slate-600 leading-snug">
+                  Diperiksa Quality Control Inspection
+                </p>
+                <p className="font-semibold text-slate-900 border-t border-slate-400 pt-1 mt-8">
                   {record.qcName}
                 </p>
               </div>
-              <div>
-                <p className="text-slate-500 mb-8">Verifikasi Barcode Karton &amp; Unit</p>
-                <p className="font-mono font-medium text-slate-900 border-t border-slate-400 pt-1 tabular-nums">
-                  Sesuai ({normalizeBarcodeCore(record.barcodeUnit)})
+              <div className="flex flex-col justify-between min-h-[88px]">
+                <p className="text-slate-600 leading-snug">
+                  Verifikasi Koordinator Quality Control
+                </p>
+                <p className="font-medium text-slate-900 border-t border-slate-400 pt-1 mt-8">
+                  Koordinator Quality Control
                 </p>
               </div>
-              <div>
-                <p className="text-slate-500 mb-8">Tanggal Pengesahan Tag</p>
-                <p className="font-medium text-slate-900 border-t border-slate-400 pt-1 tabular-nums">
-                  {formatIndonesianDate(record.tagDate)}
+              <div className="flex flex-col justify-between min-h-[88px]">
+                <p className="text-slate-600 leading-snug">
+                  Pengesahan Manager Quality Control
+                </p>
+                <p className="font-medium text-slate-900 border-t border-slate-400 pt-1 mt-8">
+                  Manager Quality Control
                 </p>
               </div>
             </footer>
