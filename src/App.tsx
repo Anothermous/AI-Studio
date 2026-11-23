@@ -69,9 +69,16 @@ export default function App() {
         setOneDriveStatus(status);
 
         if (status.connected) {
+          if (status.sharedFolderError) {
+            setOneDriveError(status.sharedFolderError);
+          }
           const prefShareUrl =
             getSavedSharedFolderUrl() || status.sharedFolderHint?.trim() || '';
-          if (prefShareUrl && status.targetFolder?.mode !== 'shared') {
+          if (
+            prefShareUrl &&
+            status.targetFolder?.mode !== 'shared' &&
+            !status.sharedFolderError
+          ) {
             try {
               const updatedFolder = await setOneDriveTargetFolder({
                 mode: 'shared',

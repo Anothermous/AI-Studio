@@ -38,6 +38,7 @@ interface SessionData {
     email: string;
   };
   targetFolder: TargetFolderConfig;
+  sharedFolderError?: string;
   createdAt: number;
 }
 
@@ -436,6 +437,115 @@ async function ensureDbRecordsFolder(
   return { root, dbRecords };
 }
 
+async function bindSharedFolderToSession(
+  accessToken: string,
+  session: SessionData,
+  opts: {
+    shareUrl?: string;
+    driveId?: string;
+    itemId?: string;
+    name?: string;
+    webUrl?: string;
+  }
+): Promise<void> {
+  let resolvedDriveId = '';
+  let resolvedItemId = '';
+  let resolvedName = opts.name?.trim() || 'Folder Bersama QC';
+  let resolvedWebUrl = opts.webUrl;
+  const cleanShareUrl = (opts.shareUrl || '').trim();
+
+  if (
+    opts.driveId &&
+    opts.itemId &&
+    isSafeGraphId(opts.driveId) &&
+    isSafeGraphId(opts.itemId)
+  ) {
+    const item = await graphJson<{
+      id: string;
+      name: string;
+      webUrl?: string;
+      folder?: Record<string, unknown>;
+    }>(
+      accessToken,
+      `https://graph.microsoft.com/v1.0/drives/${encodeURIComponent(opts.driveId)}/items/${encodeURIComponent(opts.itemId)}`
+    );
+    if (!item.folder) {
+      throw new Error('Item yang dipilih bukan sebuah folder OneDrive.');
+    }
+    resolvedDriveId = opts.driveId;
+    resolvedItemId = item.id;
+    resolvedName = item.name || resolvedName;
+    resolvedWebUrl = item.webUrl || resolvedWebUrl;
+  } else {
+    if (!cleanShareUrl || !isValidOneDriveShareUrl(cleanShareUrl)) {
+      throw new Error(
+        'Masukkan link Shared Folder dari tombol Bagikan (Share) -> Salin Tautan (https://...-my.sharepoint.com/... atau https://1drv.ms/...).'
+      );
+    }
+
+    if (cleanShareUrl.includes('/_layouts/15/onedrive.aspx')) {
+      throw new Error(
+        'Link tersebut adalah URL address bar browser. Gunakan link dari tombol Bagikan (Share) -> Salin Tautan (Copy Link) dengan izin Dapat Mengedit, atau pilih folder langsung dari daftar "Folder Dibagikan ke Anda".'
+      );
+    }
+
+    const encodedShare = encodeOneDriveShareUrl(cleanShareUrl);
+    const item = await graphJson<{
+      id: string;
+      name: string;
+      webUrl?: string;
+      folder?: Record<string, unknown>;
+      parentReference?: { driveId?: string };
+      remoteItem?: {
+        id?: string;
+        name?: string;
+        webUrl?: string;
+        folder?: Record<string, unknown>;
+        parentReference?: { driveId?: string };
+      };
+    }>(accessToken, `https://graph.microsoft.com/v1.0/shares/${encodedShare}/driveItem`);
+
+    const targetItem = item.remoteItem || item;
+    const targetDriveId =
+      targetItem.parentReference?.driveId || item.parentReference?.driveId;
+    const targetItemId = targetItem.id || item.id;
+    const targetFolderObj = targetItem.folder || item.folder;
+
+    if (!targetFolderObj || !targetDriveId || !targetItemId) {
+      throw new Error('Link yang dimasukkan bukan sebuah folder OneDrive dengan akses edit.');
+    }
+
+    resolvedDriveId = targetDriveId;
+    resolvedItemId = targetItemId;
+    resolvedName = targetItem.name || item.name || resolvedName;
+    resolvedWebUrl = targetItem.webUrl || item.webUrl;
+  }
+
+  const prevTarget = session.targetFolder;
+  session.targetFolder = {
+    mode: 'shared',
+    driveId: resolvedDriveId,
+    itemId: resolvedItemId,
+    name: resolvedName,
+    webUrl: resolvedWebUrl,
+    shareUrl: cleanShareUrl || undefined,
+  };
+
+  try {
+    await ensureDbRecordsFolder(accessToken, session);
+  } catch (permErr) {
+    session.targetFolder = prevTarget;
+    const rawMsg = permErr instanceof Error ? permErr.message : '';
+    throw new Error(
+      `Akun ${session.user.email} belum memiliki izin tulis (Can Edit) ke folder "${resolvedName}". Minta pemilik folder membagikan ulang dengan izin "Dapat Mengedit / Can Edit" (atau tambahkan akun teman langsung saat Share). Detail: ${rawMsg}`
+    );
+  }
+
+  if (cleanShareUrl) {
+    workspaceSharedFolderUrl = cleanShareUrl;
+  }
+}
+
 interface StoredPhotoRef {
   id: string;
   name: string;
@@ -503,6 +613,7 @@ async function startServer() {
       user: session ? session.user : null,
       targetFolder: session ? session.targetFolder : null,
       sharedFolderHint: workspaceSharedFolderUrl,
+      sharedFolderError: session?.sharedFolderError || null,
       redirectUri,
     });
   });
@@ -637,6 +748,21 @@ async function startServer() {
         },
         createdAt: Date.now(),
       };
+
+      // Jika ONEDRIVE_SHARED_FOLDER_URL sudah disetel di workspace, langsung hubungkan otomatis ke folder bersama
+      if (workspaceSharedFolderUrl && isValidOneDriveShareUrl(workspaceSharedFolderUrl)) {
+        try {
+          await bindSharedFolderToSession(tokenData.access_token, session, {
+            shareUrl: workspaceSharedFolderUrl,
+          });
+        } catch (autoShareErr) {
+          session.sharedFolderError =
+            autoShareErr instanceof Error
+              ? autoShareErr.message
+              : 'Gagal menghubungkan otomatis ke folder bersama OneDrive.';
+        }
+      }
+
       sessions.set(sessionId, session);
 
       setSessionCookie(res, sessionId);
@@ -778,9 +904,10 @@ async function startServer() {
       return;
     }
 
-    const { mode, shareUrl, folderName, driveId, itemId, name, webUrl } = req.body as {
+    const { mode, shareUrl, shareUrlB64, folderName, driveId, itemId, name, webUrl } = req.body as {
       mode?: 'personal' | 'shared';
       shareUrl?: string;
+      shareUrlB64?: string;
       folderName?: string;
       driveId?: string;
       itemId?: string;
@@ -788,113 +915,27 @@ async function startServer() {
       webUrl?: string;
     };
 
+    let decodedShareUrl = (shareUrl || '').trim();
+    if (!decodedShareUrl && typeof shareUrlB64 === 'string' && shareUrlB64.trim()) {
+      try {
+        decodedShareUrl = Buffer.from(shareUrlB64.trim(), 'base64').toString('utf8').trim();
+      } catch {
+        decodedShareUrl = '';
+      }
+    }
+
     try {
       const accessToken = await getValidAccessToken(session);
 
       if (mode === 'shared') {
-        let resolvedDriveId = '';
-        let resolvedItemId = '';
-        let resolvedName = name?.trim() || 'Folder Bersama QC';
-        let resolvedWebUrl = webUrl;
-        const cleanShareUrl = (shareUrl || '').trim();
-
-        if (driveId && itemId && isSafeGraphId(driveId) && isSafeGraphId(itemId)) {
-          const item = await graphJson<{
-            id: string;
-            name: string;
-            webUrl?: string;
-            folder?: Record<string, unknown>;
-          }>(
-            accessToken,
-            `https://graph.microsoft.com/v1.0/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(itemId)}`
-          );
-          if (!item.folder) {
-            res.status(400).json({
-              error: 'Item yang dipilih bukan sebuah folder OneDrive.',
-            });
-            return;
-          }
-          resolvedDriveId = driveId;
-          resolvedItemId = item.id;
-          resolvedName = item.name || resolvedName;
-          resolvedWebUrl = item.webUrl || resolvedWebUrl;
-        } else {
-          if (!cleanShareUrl || !isValidOneDriveShareUrl(cleanShareUrl)) {
-            res.status(400).json({
-              error:
-                'Masukkan link Shared Folder dari tombol Bagikan (Share) -> Salin Tautan (https://...-my.sharepoint.com/... atau https://1drv.ms/...).',
-            });
-            return;
-          }
-
-          if (cleanShareUrl.includes('/_layouts/15/onedrive.aspx')) {
-            res.status(400).json({
-              error:
-                'Link tersebut adalah URL address bar browser. Gunakan link dari tombol Bagikan (Share) -> Salin Tautan (Copy Link) dengan izin Dapat Mengedit, atau pilih folder langsung dari daftar "Folder Dibagikan ke Anda".',
-            });
-            return;
-          }
-
-          const encodedShare = encodeOneDriveShareUrl(cleanShareUrl);
-          const item = await graphJson<{
-            id: string;
-            name: string;
-            webUrl?: string;
-            folder?: Record<string, unknown>;
-            parentReference?: { driveId?: string };
-            remoteItem?: {
-              id?: string;
-              name?: string;
-              webUrl?: string;
-              folder?: Record<string, unknown>;
-              parentReference?: { driveId?: string };
-            };
-          }>(accessToken, `https://graph.microsoft.com/v1.0/shares/${encodedShare}/driveItem`);
-
-          const targetItem = item.remoteItem || item;
-          const targetDriveId =
-            targetItem.parentReference?.driveId || item.parentReference?.driveId;
-          const targetItemId = targetItem.id || item.id;
-          const targetFolderObj = targetItem.folder || item.folder;
-
-          if (!targetFolderObj || !targetDriveId || !targetItemId) {
-            res.status(400).json({
-              error: 'Link yang dimasukkan bukan sebuah folder OneDrive dengan akses edit.',
-            });
-            return;
-          }
-
-          resolvedDriveId = targetDriveId;
-          resolvedItemId = targetItemId;
-          resolvedName = targetItem.name || item.name || resolvedName;
-          resolvedWebUrl = targetItem.webUrl || item.webUrl;
-        }
-
-        const prevTarget = session.targetFolder;
-        session.targetFolder = {
-          mode: 'shared',
-          driveId: resolvedDriveId,
-          itemId: resolvedItemId,
-          name: resolvedName,
-          webUrl: resolvedWebUrl,
-          shareUrl: cleanShareUrl || undefined,
-        };
-
-        // Verifikasi langsung apakah akun ini memiliki izin tulis (Can Edit) ke folder bersama tersebut
-        try {
-          await ensureDbRecordsFolder(accessToken, session);
-        } catch (permErr) {
-          session.targetFolder = prevTarget;
-          const rawMsg = permErr instanceof Error ? permErr.message : '';
-          throw new Error(
-            `Akun ${session.user.email} belum memiliki izin tulis (Can Edit) ke folder "${resolvedName}". Minta pemilik folder membagikan ulang dengan izin "Dapat Mengedit / Can Edit" (atau tambahkan akun teman langsung saat Share). Detail: ${rawMsg}`
-          );
-        }
-
-        if (cleanShareUrl) {
-          workspaceSharedFolderUrl = cleanShareUrl;
-        }
-
+        await bindSharedFolderToSession(accessToken, session, {
+          shareUrl: decodedShareUrl || undefined,
+          driveId,
+          itemId,
+          name,
+          webUrl,
+        });
+        session.sharedFolderError = undefined;
         res.json({ targetFolder: session.targetFolder });
         return;
       }
@@ -903,6 +944,7 @@ async function startServer() {
         mode: 'personal',
         name: sanitizeSegment(folderName || DEFAULT_ROOT_FOLDER_NAME),
       };
+      session.sharedFolderError = undefined;
       await ensureRootFolder(accessToken, session);
       res.json({ targetFolder: session.targetFolder });
     } catch (err) {

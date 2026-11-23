@@ -18,6 +18,7 @@ export interface OneDriveStatus {
   } | null;
   targetFolder: OneDriveFolderConfig | null;
   sharedFolderHint?: string;
+  sharedFolderError?: string | null;
   redirectUri: string;
 }
 
@@ -90,18 +91,21 @@ async function parseJsonSafely<T>(
 
   const trimmed = text.trim();
   if (trimmed.startsWith('<')) {
+    const titleMatch = /<title[^>]*>([^<]+)<\/title>/i.exec(trimmed);
+    const htmlTitle = titleMatch ? titleMatch[1].trim() : '';
+    const detail = htmlTitle ? ` (${htmlTitle})` : '';
     if (resp.status === 401 || resp.status === 403) {
       throw new Error(
-        'Sesi browser/server perlu dimuat ulang. Silakan refresh halaman (F5), lalu hubungkan ulang OneDrive.'
+        `Sesi browser/server atau keamanan proxy menolak permintaan (HTTP ${resp.status}${detail}). Silakan refresh halaman (F5), lalu hubungkan ulang OneDrive.`
       );
     }
     if (resp.status >= 500) {
       throw new Error(
-        `Server sedang memuat ulang atau sibuk (HTTP ${resp.status}). Tunggu beberapa detik lalu coba lagi.`
+        `Server sedang memuat ulang atau sibuk (HTTP ${resp.status}${detail}). Tunggu beberapa detik lalu coba lagi.`
       );
     }
     throw new Error(
-      `Respon server bukan JSON (HTTP ${resp.status}). Silakan refresh halaman (F5) lalu coba lagi.`
+      `Respon server bukan JSON (HTTP ${resp.status}${detail}). Silakan refresh halaman (F5) lalu coba lagi.`
     );
   }
 
@@ -166,6 +170,15 @@ export async function fetchSharedOneDriveFolders(): Promise<SharedFolderItem[]> 
   return data.folders || [];
 }
 
+function encodeUtf8Base64(val: string): string {
+  const bytes = new TextEncoder().encode(val);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
 export async function setOneDriveTargetFolder(
   payload:
     | { mode: 'personal'; folderName?: string }
@@ -178,11 +191,23 @@ export async function setOneDriveTargetFolder(
         webUrl?: string;
       }
 ): Promise<OneDriveFolderConfig> {
+  const safePayload =
+    payload.mode === 'shared' && payload.shareUrl
+      ? {
+          mode: 'shared' as const,
+          shareUrlB64: encodeUtf8Base64(payload.shareUrl),
+          driveId: payload.driveId,
+          itemId: payload.itemId,
+          name: payload.name,
+          webUrl: payload.webUrl,
+        }
+      : payload;
+
   const resp = await fetch('/api/onedrive/folder', {
     method: 'POST',
     credentials: 'include',
     headers: buildHeaders(true, true),
-    body: JSON.stringify(payload),
+    body: JSON.stringify(safePayload),
   });
   const data = await parseJsonSafely<{
     targetFolder?: OneDriveFolderConfig;
