@@ -152,7 +152,7 @@ async function getValidAccessToken(session: SessionData): Promise<string> {
     client_secret: clientSecret,
     grant_type: 'refresh_token',
     refresh_token: session.refreshToken,
-    scope: 'offline_access User.Read Files.ReadWrite',
+    scope: 'offline_access User.Read Files.ReadWrite.All',
   });
 
   const tokenResp = await fetch(
@@ -490,7 +490,7 @@ async function bindSharedFolderToSession(
     }
 
     const encodedShare = encodeOneDriveShareUrl(cleanShareUrl);
-    const item = await graphJson<{
+    let item: {
       id: string;
       name: string;
       webUrl?: string;
@@ -503,7 +503,21 @@ async function bindSharedFolderToSession(
         folder?: Record<string, unknown>;
         parentReference?: { driveId?: string };
       };
-    }>(accessToken, `https://graph.microsoft.com/v1.0/shares/${encodedShare}/driveItem`);
+    };
+    try {
+      item = await graphJson(
+        accessToken,
+        `https://graph.microsoft.com/v1.0/shares/${encodedShare}/driveItem`
+      );
+    } catch (shareErr) {
+      const msg = shareErr instanceof Error ? shareErr.message : '';
+      if (/access\s*denied|forbidden|permission|unauthorized/i.test(msg)) {
+        throw new Error(
+          `Akses ditolak Microsoft Graph untuk akun ${session.user.email} (${msg}). Pastikan: (1) pemilik folder sudah klik Bagikan/Share ke akun ${session.user.email} dengan izin "Dapat Mengedit / Can Edit", dan (2) di Azure Portal -> API Permissions sudah memiliki Files.ReadWrite.All.`
+        );
+      }
+      throw shareErr;
+    }
 
     const targetItem = item.remoteItem || item;
     const targetDriveId =
@@ -639,7 +653,7 @@ async function startServer() {
       response_type: 'code',
       redirect_uri: getRedirectUri(req),
       response_mode: 'query',
-      scope: 'offline_access User.Read Files.ReadWrite',
+      scope: 'offline_access User.Read Files.ReadWrite.All',
       state,
       prompt: 'select_account',
     });
@@ -702,7 +716,7 @@ async function startServer() {
         grant_type: 'authorization_code',
         code,
         redirect_uri: getRedirectUri(req),
-        scope: 'offline_access User.Read Files.ReadWrite',
+        scope: 'offline_access User.Read Files.ReadWrite.All',
       });
 
       const tokenResp = await fetch(
