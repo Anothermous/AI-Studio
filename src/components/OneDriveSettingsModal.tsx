@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Check,
   Cloud,
@@ -10,7 +10,11 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import type { OneDriveStatus } from '../utils/onedrive';
+import {
+  fetchSharedOneDriveFolders,
+  type OneDriveStatus,
+  type SharedFolderItem,
+} from '../utils/onedrive';
 
 interface OneDriveSettingsModalProps {
   isOpen: boolean;
@@ -22,7 +26,13 @@ interface OneDriveSettingsModalProps {
   onDisconnect: () => Promise<void>;
   onSaveFolderConfig: (
     mode: 'personal' | 'shared',
-    shareUrl?: string
+    options?: {
+      shareUrl?: string;
+      driveId?: string;
+      itemId?: string;
+      name?: string;
+      webUrl?: string;
+    }
   ) => Promise<void>;
   onSyncLocalToOneDrive: () => Promise<void>;
   savedShareUrl: string;
@@ -44,12 +54,55 @@ export const OneDriveSettingsModal: React.FC<OneDriveSettingsModalProps> = ({
     status.targetFolder?.mode || (savedShareUrl ? 'shared' : 'personal')
   );
   const [shareUrlInput, setShareUrlInput] = useState<string>(
-    status.targetFolder?.shareUrl || savedShareUrl || ''
+    status.targetFolder?.shareUrl || savedShareUrl || status.sharedFolderHint || ''
   );
+  const [sharedFolders, setSharedFolders] = useState<SharedFolderItem[]>([]);
+  const [isLoadingShared, setIsLoadingShared] = useState(false);
   const [folderError, setFolderError] = useState<string | null>(null);
   const [folderSuccess, setFolderSuccess] = useState<string | null>(null);
   const [isSavingFolder, setIsSavingFolder] = useState(false);
   const [copiedUri, setCopiedUri] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const effectiveMode =
+      status.targetFolder?.mode ||
+      (savedShareUrl || status.sharedFolderHint ? 'shared' : 'personal');
+    setFolderMode(effectiveMode);
+    setShareUrlInput(
+      status.targetFolder?.shareUrl ||
+        savedShareUrl ||
+        status.sharedFolderHint ||
+        ''
+    );
+    setFolderError(null);
+    setFolderSuccess(null);
+  }, [
+    isOpen,
+    status.targetFolder?.mode,
+    status.targetFolder?.shareUrl,
+    status.sharedFolderHint,
+    savedShareUrl,
+  ]);
+
+  useEffect(() => {
+    if (!isOpen || !status.connected) return;
+    let active = true;
+    setIsLoadingShared(true);
+    fetchSharedOneDriveFolders()
+      .then((list) => {
+        if (active) setSharedFolders(list);
+      })
+      .catch(() => {
+        if (active) setSharedFolders([]);
+      })
+      .finally(() => {
+        if (active) setIsLoadingShared(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isOpen, status.connected]);
 
   if (!isOpen) return null;
 
@@ -69,7 +122,10 @@ export const OneDriveSettingsModal: React.FC<OneDriveSettingsModalProps> = ({
     setFolderSuccess(null);
     setIsSavingFolder(true);
     try {
-      await onSaveFolderConfig(folderMode, shareUrlInput);
+      await onSaveFolderConfig(
+        folderMode,
+        folderMode === 'shared' ? { shareUrl: shareUrlInput } : undefined
+      );
       setFolderSuccess(
         folderMode === 'shared'
           ? 'Folder bersama tim QC di OneDrive berhasil terhubung.'
@@ -84,6 +140,27 @@ export const OneDriveSettingsModal: React.FC<OneDriveSettingsModalProps> = ({
     }
   };
 
+  const handleSelectSharedFolder = async (folder: SharedFolderItem) => {
+    setFolderError(null);
+    setFolderSuccess(null);
+    setIsSavingFolder(true);
+    try {
+      await onSaveFolderConfig('shared', {
+        driveId: folder.driveId,
+        itemId: folder.itemId,
+        name: folder.name,
+        webUrl: folder.webUrl,
+      });
+      setFolderSuccess(`Berhasil terhubung ke folder bersama "${folder.name}".`);
+    } catch (err) {
+      setFolderError(
+        err instanceof Error ? err.message : 'Gagal mengakses folder bersama tersebut.'
+      );
+    } finally {
+      setIsSavingFolder(false);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 overflow-y-auto"
@@ -91,7 +168,7 @@ export const OneDriveSettingsModal: React.FC<OneDriveSettingsModalProps> = ({
       aria-modal="true"
       aria-label="Pengaturan Penyimpanan OneDrive QC"
     >
-      <div className="bg-white border border-slate-200 rounded-lg w-full max-w-xl overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-lg w-full max-w-xl overflow-hidden my-auto">
         {/* Header Modal */}
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
@@ -115,7 +192,7 @@ export const OneDriveSettingsModal: React.FC<OneDriveSettingsModalProps> = ({
           </button>
         </div>
 
-        <div className="p-6 space-y-5 text-sm">
+        <div className="p-6 space-y-5 text-sm max-h-[82vh] overflow-y-auto">
           {/* Status Koneksi Akun Microsoft */}
           {!status.configured ? (
             <div className="border border-amber-300 bg-amber-50 rounded-md p-4 space-y-2.5 text-xs text-amber-950">
@@ -163,7 +240,7 @@ export const OneDriveSettingsModal: React.FC<OneDriveSettingsModalProps> = ({
                   Akun Microsoft OneDrive Belum Terhubung
                 </p>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Setiap QC dapat masuk menggunakan akun Microsoft 365 / OneDrive untuk membaca &amp; menyimpan data bersama.
+                  Setiap QC dapat masuk menggunakan akun Microsoft 365 perusahaan (satu tenant) untuk membaca &amp; menyimpan data bersama.
                 </p>
               </div>
               <button
@@ -206,7 +283,10 @@ export const OneDriveSettingsModal: React.FC<OneDriveSettingsModalProps> = ({
                 Lokasi Penyimpanan Folder OneDrive
               </h3>
               <p className="text-xs text-slate-600 mt-0.5">
-                Agar seluruh QC mengakses data yang sama, pilih <strong>Folder Bersama Tim QC</strong> lalu tempel link folder OneDrive yang sudah di-share (izin Edit).
+                Agar akun teman masuk ke 1 folder yang sama, pilih{' '}
+                <strong>Folder Bersama (Seluruh QC)</strong> lalu pilih folder yang di-share ke akunnya atau tempel link{' '}
+                <strong>Bagikan (Share) → Salin Tautan</strong> dengan izin{' '}
+                <strong>Dapat Mengedit (Can Edit)</strong>.
               </p>
             </div>
 
@@ -232,7 +312,7 @@ export const OneDriveSettingsModal: React.FC<OneDriveSettingsModalProps> = ({
                     <span>Folder Bersama (Seluruh QC)</span>
                   </span>
                   <span className="block text-slate-500 mt-0.5">
-                    Semua akun QC menulis &amp; membaca dari 1 folder shared link.
+                    Semua akun QC menulis &amp; membaca dari 1 folder shared.
                   </span>
                 </div>
               </label>
@@ -258,29 +338,91 @@ export const OneDriveSettingsModal: React.FC<OneDriveSettingsModalProps> = ({
                     <span>Folder Akun (/Finish-Good-QC)</span>
                   </span>
                   <span className="block text-slate-500 mt-0.5">
-                    Cocok jika semua QC memakai 1 akun Microsoft QC bersama.
+                    Menyimpan di folder OneDrive akun yang sedang login.
                   </span>
                 </div>
               </label>
             </div>
 
             {folderMode === 'shared' && (
-              <div>
-                <label
-                  htmlFor="onedrive-share-url"
-                  className="block text-xs font-medium text-slate-700 mb-1"
-                >
-                  Link Shared Folder OneDrive / SharePoint (Izin Edit)
-                </label>
-                <input
-                  id="onedrive-share-url"
-                  type="url"
-                  value={shareUrlInput}
-                  onChange={(e) => setShareUrlInput(e.target.value)}
-                  placeholder="https://...sharepoint.com/... atau https://1drv.ms/..."
-                  className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                  required={folderMode === 'shared'}
-                />
+              <div className="space-y-3">
+                {/* Daftar Folder yang sudah di-share ke akun yang sedang login */}
+                {status.connected && (
+                  <div className="border border-slate-200 rounded-md p-3 bg-slate-50/70 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-slate-800">
+                        Folder yang Dibagikan ke Akun Ini (Shared with me)
+                      </span>
+                      {isLoadingShared && (
+                        <span className="text-[11px] text-slate-500">Memuat...</span>
+                      )}
+                    </div>
+                    {sharedFolders.length > 0 ? (
+                      <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                        {sharedFolders.map((folder) => {
+                          const isActive =
+                            status.targetFolder?.mode === 'shared' &&
+                            status.targetFolder.itemId === folder.itemId;
+                          return (
+                            <div
+                              key={`${folder.driveId}:${folder.itemId}`}
+                              className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded border text-xs bg-white ${
+                                isActive
+                                  ? 'border-emerald-400 bg-emerald-50/40'
+                                  : 'border-slate-200'
+                              }`}
+                            >
+                              <div className="min-w-0">
+                                <p className="font-semibold text-slate-900 truncate">
+                                  {folder.name}
+                                </p>
+                                {folder.ownerName && (
+                                  <p className="text-[11px] text-slate-500 truncate">
+                                    Pemilik: {folder.ownerName}
+                                  </p>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                disabled={isSavingFolder}
+                                onClick={() => void handleSelectSharedFolder(folder)}
+                                className={`px-2.5 py-1 rounded text-[11px] font-semibold shrink-0 cursor-pointer ${
+                                  isActive
+                                    ? 'bg-emerald-700 text-white'
+                                    : 'bg-slate-900 text-white hover:bg-slate-800'
+                                }`}
+                              >
+                                {isActive ? 'Aktif' : 'Pilih Folder'}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : !isLoadingShared ? (
+                      <p className="text-[11px] text-slate-500">
+                        Belum ada folder yang terdeteksi di "Shared with me". Pastikan pemilik folder sudah melakukan Share langsung ke email akun ini dengan izin <strong>Dapat Mengedit (Can Edit)</strong>, atau tempel link Share di bawah.
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+
+                <div>
+                  <label
+                    htmlFor="onedrive-share-url"
+                    className="block text-xs font-medium text-slate-700 mb-1"
+                  >
+                    Atau Tempel Link Shared Folder (Bagikan → Salin Tautan, Izin Edit)
+                  </label>
+                  <input
+                    id="onedrive-share-url"
+                    type="url"
+                    value={shareUrlInput}
+                    onChange={(e) => setShareUrlInput(e.target.value)}
+                    placeholder="https://...-my.sharepoint.com/:f:/g/personal/... atau https://1drv.ms/..."
+                    className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                    required={folderMode === 'shared'}
+                  />
+                </div>
               </div>
             )}
 
@@ -302,10 +444,14 @@ export const OneDriveSettingsModal: React.FC<OneDriveSettingsModalProps> = ({
             )}
 
             {folderError && (
-              <p className="text-xs font-medium text-red-700">{folderError}</p>
+              <p className="text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
+                {folderError}
+              </p>
             )}
             {folderSuccess && (
-              <p className="text-xs font-medium text-emerald-700">{folderSuccess}</p>
+              <p className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-3 py-2">
+                {folderSuccess}
+              </p>
             )}
 
             {status.connected && (

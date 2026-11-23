@@ -17,7 +17,16 @@ export interface OneDriveStatus {
     email: string;
   } | null;
   targetFolder: OneDriveFolderConfig | null;
+  sharedFolderHint?: string;
   redirectUri: string;
+}
+
+export interface SharedFolderItem {
+  driveId: string;
+  itemId: string;
+  name: string;
+  webUrl?: string;
+  ownerName?: string;
 }
 
 const SHARED_FOLDER_PREF_KEY = 'wie_qc_shared_folder_url_v1';
@@ -99,10 +108,32 @@ export async function disconnectOneDrive(): Promise<void> {
   memorySessionToken = null;
 }
 
+export async function fetchSharedOneDriveFolders(): Promise<SharedFolderItem[]> {
+  const resp = await fetch('/api/onedrive/shared-folders', {
+    credentials: 'include',
+    headers: buildHeaders(false, false),
+  });
+  const data = (await resp.json()) as {
+    folders?: SharedFolderItem[];
+    error?: string;
+  };
+  if (!resp.ok) {
+    throw new Error(data.error || 'Gagal mengambil daftar folder bersama OneDrive.');
+  }
+  return data.folders || [];
+}
+
 export async function setOneDriveTargetFolder(
   payload:
     | { mode: 'personal'; folderName?: string }
-    | { mode: 'shared'; shareUrl: string }
+    | {
+        mode: 'shared';
+        shareUrl?: string;
+        driveId?: string;
+        itemId?: string;
+        name?: string;
+        webUrl?: string;
+      }
 ): Promise<OneDriveFolderConfig> {
   const resp = await fetch('/api/onedrive/folder', {
     method: 'POST',

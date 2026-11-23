@@ -69,7 +69,8 @@ export default function App() {
         setOneDriveStatus(status);
 
         if (status.connected) {
-          const prefShareUrl = getSavedSharedFolderUrl();
+          const prefShareUrl =
+            getSavedSharedFolderUrl() || status.sharedFolderHint?.trim() || '';
           if (prefShareUrl && status.targetFolder?.mode !== 'shared') {
             try {
               const updatedFolder = await setOneDriveTargetFolder({
@@ -77,9 +78,15 @@ export default function App() {
                 shareUrl: prefShareUrl,
               });
               status.targetFolder = updatedFolder;
+              saveSharedFolderUrlPref(prefShareUrl);
+              setSavedShareUrl(prefShareUrl);
               setOneDriveStatus({ ...status });
-            } catch {
-              // Tetap lanjutkan memuat dari folder default jika link share tidak lagi valid
+            } catch (folderErr) {
+              setOneDriveError(
+                folderErr instanceof Error
+                  ? folderErr.message
+                  : 'Gagal menghubungkan ke folder bersama OneDrive.'
+              );
             }
           }
           const { records: odRecords, targetFolder } =
@@ -177,16 +184,28 @@ export default function App() {
 
   const handleSaveFolderConfig = async (
     mode: 'personal' | 'shared',
-    shareUrl?: string
+    options?: {
+      shareUrl?: string;
+      driveId?: string;
+      itemId?: string;
+      name?: string;
+      webUrl?: string;
+    }
   ) => {
     if (mode === 'shared') {
-      const cleanUrl = (shareUrl || '').trim();
-      saveSharedFolderUrlPref(cleanUrl);
-      setSavedShareUrl(cleanUrl);
+      const cleanUrl = (options?.shareUrl || '').trim();
+      if (cleanUrl) {
+        saveSharedFolderUrlPref(cleanUrl);
+        setSavedShareUrl(cleanUrl);
+      }
       if (oneDriveStatus.connected) {
         const updated = await setOneDriveTargetFolder({
           mode: 'shared',
-          shareUrl: cleanUrl,
+          shareUrl: cleanUrl || undefined,
+          driveId: options?.driveId,
+          itemId: options?.itemId,
+          name: options?.name,
+          webUrl: options?.webUrl,
         });
         setOneDriveStatus((prev) => ({ ...prev, targetFolder: updated }));
         await loadWorkspaceData();
