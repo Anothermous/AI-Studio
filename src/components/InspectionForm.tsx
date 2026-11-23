@@ -7,7 +7,6 @@ import {
   Clock,
   FileCheck2,
   Printer,
-  RotateCcw,
   ShieldAlert,
   Trash2,
   Upload,
@@ -95,6 +94,7 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [savedRecord, setSavedRecord] = useState<QCInspectionRecord | null>(null);
 
+  const unitInputRef = useRef<HTMLInputElement>(null);
   const cartonInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -184,7 +184,7 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
     setSavedRecord(null);
   };
 
-  const handleResetForNextUnit = () => {
+  const clearFormFields = () => {
     setBarcodeUnit('');
     setBarcodeCarton('');
     setUnitType('');
@@ -196,6 +196,10 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
     setNotes('');
     setPhotoError(null);
     setSubmitError(null);
+  };
+
+  const handleResetForNextUnit = () => {
+    clearFormFields();
     setSavedRecord(null);
   };
 
@@ -259,7 +263,12 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
       };
 
       await onRecordSaved(record);
+      clearFormFields();
       setSavedRecord(record);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.setTimeout(() => {
+        unitInputRef.current?.focus();
+      }, 100);
     } catch (err) {
       setSubmitError(
         err instanceof Error ? err.message : 'Terjadi kesalahan saat menyimpan data QC.'
@@ -284,7 +293,7 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
                 <CheckCircle2 className="w-5 h-5 text-emerald-700 mt-0.5 shrink-0" />
                 <div>
                   <h3 className="text-sm font-bold text-emerald-950">
-                    Data Finish Good Berhasil Disimpan &amp; Terverifikasi
+                    Data Finish Good Berhasil Disimpan &amp; Form Siap untuk Unit Berikutnya
                   </h3>
                   <p className="text-xs text-emerald-900 mt-1 font-mono tabular-nums">
                     Barcode: {savedRecord.barcodeUnit} · QC: {savedRecord.qcName} · Tanggal Tag:{' '}
@@ -303,11 +312,11 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={handleResetForNextUnit}
-                  className="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-slate-300 text-slate-800 text-xs font-semibold rounded-md hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                  onClick={() => setSavedRecord(null)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-300 text-slate-700 text-xs font-semibold rounded-md hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Input Unit Baru</span>
+                  <X className="w-3.5 h-3.5" />
+                  <span>Tutup</span>
                 </button>
               </div>
             </div>
@@ -449,6 +458,7 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
                   <div className="relative">
                     <Barcode className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
+                      ref={unitInputRef}
                       id="barcode-unit"
                       type="text"
                       value={barcodeUnit}
