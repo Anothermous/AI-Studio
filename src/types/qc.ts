@@ -38,7 +38,7 @@ export const PRODUCT_CATEGORIES: readonly ProductCategoryConfig[] = [
     formTitle: 'Form Finish Good Tangki Solar Water Heater',
     typeFieldLabel: '3. Type Unit',
     completenessTitle:
-      '6. Kelengkapan Tangki SWH - Pipa Aksesoris Panas & Dingin - Long & Short Fixing Strap',
+      '6. Kelengkapan Tangki SWH - Buku Manual dan Garansi - Pipa Aksesoris Panas & Dingin - Long & Short Fixing Strap',
     unitTypes: [
       'ST100SR-02',
       'ST130SR-02',
@@ -49,11 +49,13 @@ export const PRODUCT_CATEGORIES: readonly ProductCategoryConfig[] = [
       'ST300LN-03',
     ],
     checklistItems: [
+      { key: 'manualWarranty', label: 'Buku Manual dan Garansi' },
       { key: 'pipaPanas', label: 'Pipa Aksesoris Panas' },
       { key: 'pipaDingin', label: 'Pipa Aksesoris Dingin' },
       { key: 'fixingStrap', label: 'Long Fixing Strap & Short Fixing Strap' },
     ],
     photoSuggestions: [
+      'Buku Manual dan Garansi',
       'Pipa Aksesoris Panas & Dingin',
       'Long & Short Fixing Strap',
       'Label Barcode Unit & Karton',
