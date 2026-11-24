@@ -10,7 +10,8 @@ export type ProductCategoryId =
   | 'kolektor_swh'
   | 'at_series'
   | 'electric_wh'
-  | 'heat_pump';
+  | 'heat_pump'
+  | 'tph';
 
 export interface ChecklistItemDef {
   key: string;
@@ -37,7 +38,7 @@ export const PRODUCT_CATEGORIES: readonly ProductCategoryConfig[] = [
     formTitle: 'Form Finish Good Tangki Solar Water Heater',
     typeFieldLabel: '3. Type Unit',
     completenessTitle:
-      '6. Komponen Pendukung Tangki - Manual & Warranty Books - Long Fixing Strap & Short Fixing Strap - Pipa Aksesoris Panas - Pipa Aksesoris Dingin',
+      '6. Kelengkapan Tangki SWH - Pipa Aksesoris Panas & Dingin - Long & Short Fixing Strap',
     unitTypes: [
       'ST100SR-02',
       'ST130SR-02',
@@ -48,17 +49,13 @@ export const PRODUCT_CATEGORIES: readonly ProductCategoryConfig[] = [
       'ST300LN-03',
     ],
     checklistItems: [
-      { key: 'komponenPendukung', label: 'Komponen Pendukung Tangki' },
-      { key: 'manualWarranty', label: 'Manual & Warranty Books' },
-      { key: 'fixingStrap', label: 'Long Fixing Strap & Short Fixing Strap' },
       { key: 'pipaPanas', label: 'Pipa Aksesoris Panas' },
       { key: 'pipaDingin', label: 'Pipa Aksesoris Dingin' },
+      { key: 'fixingStrap', label: 'Long Fixing Strap & Short Fixing Strap' },
     ],
     photoSuggestions: [
-      'Kelengkapan Komponen Tangki',
-      'Manual & Warranty Books',
-      'Long & Short Fixing Strap',
       'Pipa Aksesoris Panas & Dingin',
+      'Long & Short Fixing Strap',
       'Label Barcode Unit & Karton',
     ],
   },
@@ -69,7 +66,7 @@ export const PRODUCT_CATEGORIES: readonly ProductCategoryConfig[] = [
     formTitle: 'Form Finish Good Kolektor Solar Water Heater',
     typeFieldLabel: '3. Type Unit',
     completenessTitle:
-      '6. Kelengkapan Kolektor - Manual & Warranty Books - Fitting & Aksesoris Pemasangan - Kemasan Karton',
+      '6. Kelengkapan Kolektor SWH - Neple Plug (Tipe A & C) dan Non Neple Plug (Tipe B)',
     unitTypes: [
       'SC165SA-02A',
       'SC165SA-02',
@@ -78,16 +75,11 @@ export const PRODUCT_CATEGORIES: readonly ProductCategoryConfig[] = [
       'SC200LB-02',
     ],
     checklistItems: [
-      { key: 'unitKolektor', label: 'Unit Kolektor & Kondisi Kaca/Frame' },
-      { key: 'manualWarranty', label: 'Manual & Warranty Books' },
-      { key: 'fittingKolektor', label: 'Fitting & Nepel Sambungan' },
-      { key: 'aksesorisPasang', label: 'Braket / Karet Seal & Aksesoris' },
-      { key: 'kemasanKarton', label: 'Pelindung Sudut & Label Karton' },
+      { key: 'neplePlug', label: 'Neple Plug (Tipe A & C)' },
+      { key: 'nonNeplePlug', label: 'Non Neple Plug (Tipe B)' },
     ],
     photoSuggestions: [
-      'Kondisi Unit Kolektor & Kaca',
-      'Manual & Warranty Books',
-      'Fitting & Aksesoris Kolektor',
+      'Neple Plug / Non Neple Plug',
       'Label Barcode Unit & Karton',
     ],
   },
@@ -98,19 +90,17 @@ export const PRODUCT_CATEGORIES: readonly ProductCategoryConfig[] = [
     formTitle: 'Form Finish Good Aircon WH',
     typeFieldLabel: '3. Type Produk',
     completenessTitle:
-      '6. Kelengkapan Unit Aircon WH - Manual & Warranty Books - Braket & Aksesoris Pemasangan - Kemasan Karton',
+      '6. Kelengkapan Aircon WH - Safety Valve - Hex Nut - Tee Joint - Buku Manual dan Garansi',
     unitTypes: ['AT50FHS', 'AT100RHS', 'AT100RHD'],
     checklistItems: [
-      { key: 'unitUtama', label: 'Unit Utama Aircon WH & Kondisi Fisik' },
-      { key: 'manualWarranty', label: 'Manual & Warranty Books' },
-      { key: 'braketBaut', label: 'Braket & Baut Pemasangan' },
-      { key: 'aksesorisValve', label: 'Aksesoris Pipa & Safety Valve' },
-      { key: 'kemasanKarton', label: 'Kemasan & Label Karton' },
+      { key: 'safetyValve', label: 'Safety Valve' },
+      { key: 'hexNut', label: 'Hex Nut' },
+      { key: 'teeJoint', label: 'Tee Joint' },
+      { key: 'manualWarranty', label: 'Buku Manual dan Garansi' },
     ],
     photoSuggestions: [
-      'Kelengkapan Unit Aircon WH',
-      'Manual & Warranty Books',
-      'Aksesoris & Braket',
+      'Safety Valve, Hex Nut & Tee Joint',
+      'Buku Manual dan Garansi',
       'Label Barcode Unit & Karton',
     ],
   },
@@ -121,19 +111,15 @@ export const PRODUCT_CATEGORIES: readonly ProductCategoryConfig[] = [
     formTitle: 'Form Finish Good Electric Water Heater',
     typeFieldLabel: '3. Type Produk Electric Water Heater',
     completenessTitle:
-      '6. Kelengkapan Electric Water Heater - Manual & Warranty Books - Braket & Safety Valve - Kemasan Karton',
+      '6. Kelengkapan Electric WH - Braket dan Baut Fisher - Buku Manual dan Garansi',
     unitTypes: ['ET15BC01', 'ET30BC01'],
     checklistItems: [
-      { key: 'unitElectric', label: 'Unit Electric Water Heater & Kabel Power' },
-      { key: 'manualWarranty', label: 'Manual & Warranty Books' },
-      { key: 'braketDynabolt', label: 'Braket Dinding & Dynabolt' },
-      { key: 'safetyValve', label: 'Safety Valve & Aksesoris' },
-      { key: 'kemasanKarton', label: 'Kemasan & Label Karton' },
+      { key: 'braketBautFisher', label: 'Braket dan Baut Fisher' },
+      { key: 'manualWarranty', label: 'Buku Manual dan Garansi' },
     ],
     photoSuggestions: [
-      'Unit Electric Water Heater',
-      'Manual & Warranty Books',
-      'Safety Valve, Braket & Aksesoris',
+      'Braket dan Baut Fisher',
+      'Buku Manual dan Garansi',
       'Label Barcode Unit & Karton',
     ],
   },
@@ -144,7 +130,7 @@ export const PRODUCT_CATEGORIES: readonly ProductCategoryConfig[] = [
     formTitle: 'Form Finish Good Heat Pump Water Heater',
     typeFieldLabel: '3. Type Unit',
     completenessTitle:
-      '6. Kelengkapan Heat Pump - Manual & Warranty Books - Controller & Drain Fitting - Kemasan Karton',
+      '6. Kelengkapan Heat Pump - Buku Manual dan Garansi - Kelengkapan Bawaan Heatpump',
     unitTypes: [
       'HPR4-SC-01',
       'HPR6-SC-01',
@@ -156,17 +142,36 @@ export const PRODUCT_CATEGORIES: readonly ProductCategoryConfig[] = [
       'HPS15-SC-01',
     ],
     checklistItems: [
-      { key: 'unitHeatPump', label: 'Unit Heat Pump & Kondisi Casing/Sirip' },
-      { key: 'manualWarranty', label: 'Manual & Warranty Books' },
-      { key: 'controllerKabel', label: 'Controller / Kabel Sensor' },
-      { key: 'drainFitting', label: 'Drain Fitting & Karet Dudukan' },
-      { key: 'kemasanKarton', label: 'Kemasan & Label Karton' },
+      { key: 'manualWarranty', label: 'Buku Manual dan Garansi' },
+      { key: 'kelengkapanBawaan', label: 'Kelengkapan Bawaan Heatpump' },
     ],
     photoSuggestions: [
-      'Kelengkapan Unit Heat Pump',
-      'Manual & Warranty Books',
-      'Controller & Drain Fitting',
+      'Buku Manual dan Garansi',
+      'Kelengkapan Bawaan Heatpump',
       'Label Barcode Unit & Karton',
+    ],
+  },
+  {
+    id: 'tph',
+    shortLabel: 'TPH',
+    label: 'Produk TPH',
+    formTitle: 'Form Finish Good Produk TPH',
+    typeFieldLabel: '3. Type Unit TPH',
+    completenessTitle:
+      '6. Pemeriksaan Produk TPH (Non-ACC & Non-Buku) - Visual - Stiker Data - Barcode & Plat Nomor',
+    unitTypes: ['PT300L', 'PT500L', 'PT500E'],
+    checklistItems: [
+      { key: 'visual', label: 'Visual Kondisi Fisik Unit' },
+      { key: 'stikerData', label: 'Stiker Data Produk' },
+      {
+        key: 'barcodePlatStiker',
+        label: 'Barcode, Plat Nomor & Stiker Data Produk',
+      },
+    ],
+    photoSuggestions: [
+      'Visual',
+      'Stiker Data',
+      'Barcode, Plat Nomor & Stiker Data Produk',
     ],
   },
 ] as const;
@@ -177,6 +182,32 @@ export function getCategoryConfig(
   return (
     PRODUCT_CATEGORIES.find((c) => c.id === categoryId) ?? PRODUCT_CATEGORIES[0]
   );
+}
+
+export function isKolektorWithoutNeplePlug(unitType: string): boolean {
+  const normalized = unitType.trim().toUpperCase();
+  if (!normalized) return false;
+  return /LB\b|LB-|KOLEKTOR\s*B\b/.test(normalized);
+}
+
+export function getChecklistItemsForUnit(
+  categoryId: ProductCategoryId | undefined,
+  _unitType: string
+): readonly ChecklistItemDef[] {
+  return getCategoryConfig(categoryId).checklistItems;
+}
+
+export function getPhotoSuggestionsForUnit(
+  categoryId: ProductCategoryId | undefined,
+  unitType: string
+): readonly string[] {
+  const config = getCategoryConfig(categoryId);
+  if (config.id === 'kolektor_swh' && unitType) {
+    return isKolektorWithoutNeplePlug(unitType)
+      ? ['Non Neple Plug (Tipe B)', 'Label Barcode Unit & Karton']
+      : ['Neple Plug (Tipe A & C)', 'Label Barcode Unit & Karton'];
+  }
+  return config.photoSuggestions;
 }
 
 export const UNIT_STATUSES = [

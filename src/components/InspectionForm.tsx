@@ -18,6 +18,9 @@ import {
   QC_PRESET_INSPECTORS,
   UNIT_STATUSES,
   getCategoryConfig,
+  getChecklistItemsForUnit,
+  getPhotoSuggestionsForUnit,
+  isKolektorWithoutNeplePlug,
   type ProductCategoryConfig,
   type ProductCategoryId,
   type QCInspectionRecord,
@@ -42,10 +45,19 @@ interface InspectionFormProps {
 }
 
 function buildDefaultChecklist(
-  category: ProductCategoryConfig
+  category: ProductCategoryConfig,
+  unitType = ''
 ): Record<string, boolean> {
+  if (category.id === 'kolektor_swh') {
+    const isB = isKolektorWithoutNeplePlug(unitType);
+    return {
+      neplePlug: !isB,
+      nonNeplePlug: isB,
+    };
+  }
   const result: Record<string, boolean> = {};
-  for (const item of category.checklistItems) {
+  const items = getChecklistItemsForUnit(category.id, unitType);
+  for (const item of items) {
     result[item.key] = true;
   }
   return result;
@@ -140,6 +152,7 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
     setIsProcessingPhotos(true);
     try {
       const processed: QCPhoto[] = [];
+      const suggestions = getPhotoSuggestionsForUnit(selectedCategory, unitType);
       for (let i = 0; i < validImages.length; i++) {
         const file = validImages[i];
         const { dataUrl, sizeBytes } = await compressImageFile(file);
@@ -148,8 +161,7 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           name: file.name,
           label:
-            categoryConfig.photoSuggestions[nextIdx] ??
-            `Foto Kelengkapan ${nextIdx + 1}`,
+            suggestions[nextIdx] ?? `Foto Kelengkapan ${nextIdx + 1}`,
           dataUrl,
           sizeBytes,
         });
@@ -278,7 +290,23 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
     }
   };
 
-  const allChecklistChecked = categoryConfig.checklistItems.every(
+  const activeChecklistItems = getChecklistItemsForUnit(selectedCategory, unitType);
+  const activePhotoSuggestions = getPhotoSuggestionsForUnit(selectedCategory, unitType);
+  const isKolektorB =
+    selectedCategory === 'kolektor_swh' && isKolektorWithoutNeplePlug(unitType);
+
+  const handleSelectUnitType = (nextType: string) => {
+    setUnitType(nextType);
+    if (selectedCategory === 'kolektor_swh') {
+      const isB = isKolektorWithoutNeplePlug(nextType);
+      setChecklist({
+        neplePlug: !isB,
+        nonNeplePlug: isB,
+      });
+    }
+  };
+
+  const allChecklistChecked = activeChecklistItems.every(
     (item) => Boolean(checklist[item.key])
   );
 
@@ -609,7 +637,7 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
                         name="unitType"
                         value={type}
                         checked={selected}
-                        onChange={() => setUnitType(type)}
+                        onChange={() => handleSelectUnitType(type)}
                         className="accent-blue-700 w-4 h-4 shrink-0"
                       />
                       <span className="truncate">{type}</span>
@@ -617,6 +645,11 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
                   );
                 })}
               </div>
+              {selectedCategory === 'kolektor_swh' && (
+                <p className="text-xs text-slate-500 mt-2.5">
+                  Tipe A &amp; C menggunakan Neple Plug; Tipe Kolektor B (SC200LB-02) tidak menggunakan Neple Plug.
+                </p>
+              )}
             </fieldset>
 
             {/* 4. Status Unit & 5. Tanggal di Tag */}
@@ -696,7 +729,9 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
                     <span className="text-red-600">*</span>
                   </h2>
                   <p className="text-xs text-slate-500 mt-1">
-                    Centang kelengkapan fisik dan unggah foto bukti kelengkapan produk (maksimal {MAX_PHOTOS} foto).
+                    {selectedCategory === 'tph'
+                      ? 'Produk TPH (Non-ACC & Non-Buku): cukup unggah foto 1. Visual, 2. Stiker Data, 3. Barcode, Plat Nomor & Stiker Data Produk.'
+                      : `Centang kelengkapan fisik dan unggah foto bukti kelengkapan produk (maksimal ${MAX_PHOTOS} foto).`}
                   </p>
                 </div>
                 <button
@@ -704,7 +739,7 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
                   onClick={() => {
                     const nextVal = !allChecklistChecked;
                     const updated: Record<string, boolean> = {};
-                    for (const item of categoryConfig.checklistItems) {
+                    for (const item of activeChecklistItems) {
                       updated[item.key] = nextVal;
                     }
                     setChecklist(updated);
@@ -715,9 +750,15 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
                 </button>
               </div>
 
+              {isKolektorB && (
+                <div className="mb-3 px-3 py-2 border border-slate-200 bg-slate-50 rounded-md text-xs text-slate-700">
+                  Khusus tipe Kolektor B (<strong>{unitType}</strong>): otomatis memilih <strong>Non Neple Plug</strong> (tidak menggunakan Neple Plug).
+                </div>
+              )}
+
               {/* Checklist Item */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
-                {categoryConfig.checklistItems.map((item) => (
+                {activeChecklistItems.map((item) => (
                   <label
                     key={item.key}
                     className="flex items-center gap-2.5 px-3 py-2 border border-slate-200 rounded-md text-xs text-slate-800 hover:bg-slate-50 cursor-pointer"
@@ -737,6 +778,13 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
                   </label>
                 ))}
               </div>
+
+              {activePhotoSuggestions.length > 0 && (
+                <p className="text-xs text-slate-600 mb-3">
+                  <span className="font-semibold text-slate-800">Foto yang diperlukan: </span>
+                  {activePhotoSuggestions.map((s, idx) => `${idx + 1}. ${s}`).join(' · ')}
+                </p>
+              )}
 
               {/* Dropzone & Upload Actions */}
               <div
@@ -1024,6 +1072,9 @@ export const InspectionForm: React.FC<InspectionFormProps> = ({
             </div>
 
             <div className="pt-2 border-t border-slate-200 flex flex-col items-center">
+              <p className="text-[11px] font-mono font-bold text-slate-900 mb-1">
+                Tipe Unit / Tangki: {unitType || '—'}
+              </p>
               <BarcodeSvg
                 value={isBarcodeMatch ? trimmedUnit : trimmedUnit || ''}
                 height={38}

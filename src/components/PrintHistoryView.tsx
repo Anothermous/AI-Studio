@@ -53,6 +53,7 @@ export const PrintHistoryView: React.FC<PrintHistoryViewProps> = ({
       at_series: 0,
       electric_wh: 0,
       heat_pump: 0,
+      tph: 0,
     };
     for (const rec of records) {
       const cat = rec.productCategory ?? 'tangki_swh';

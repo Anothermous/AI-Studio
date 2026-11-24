@@ -17,6 +17,7 @@ const CATEGORY_FOLDER_NAMES: Record<string, string> = {
   at_series: 'Aircon-WH',
   electric_wh: 'Electric-WH',
   heat_pump: 'Heat-Pump',
+  tph: 'TPH',
 };
 
 interface TargetFolderConfig {

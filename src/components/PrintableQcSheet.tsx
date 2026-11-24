@@ -1,6 +1,10 @@
 import React from 'react';
 import { CheckCircle2 } from 'lucide-react';
-import { getCategoryConfig, type QCInspectionRecord } from '../types/qc';
+import {
+  getCategoryConfig,
+  getChecklistItemsForUnit,
+  type QCInspectionRecord,
+} from '../types/qc';
 import { formatIndonesianDate } from '../utils/storage';
 import { normalizeBarcodeCore } from '../utils/barcode';
 import { BarcodeSvg } from './BarcodeSvg';
@@ -19,6 +23,10 @@ export const PrintableQcSheet: React.FC<PrintableQcSheetProps> = ({ records }) =
     <div className="print-container space-y-8">
       {records.map((record) => {
         const category = getCategoryConfig(record.productCategory);
+        const unitChecklistItems = getChecklistItemsForUnit(
+          record.productCategory,
+          record.unitType
+        );
         const photoGridClass =
           record.photos.length === 1
             ? 'grid-cols-1 max-w-md'
@@ -93,6 +101,9 @@ export const PrintableQcSheet: React.FC<PrintableQcSheetProps> = ({ records }) =
               </div>
 
               <div className="md:col-span-5 flex flex-col items-center justify-center border border-slate-200 bg-slate-50/50 p-3 print:bg-white print:border-slate-400">
+                <span className="text-xs font-mono font-bold text-slate-950 mb-0.5 text-center">
+                  Tipe Unit / Tangki: {record.unitType}
+                </span>
                 <span className="text-[11px] font-medium text-slate-600 mb-1.5 text-center">
                   {record.barcodeUnit.toUpperCase() === record.barcodeCarton.toUpperCase()
                     ? 'Barcode Unit & Karton (Terverifikasi Sama)'
@@ -108,7 +119,7 @@ export const PrintableQcSheet: React.FC<PrintableQcSheetProps> = ({ records }) =
                 Pemeriksaan Kelengkapan Komponen Produk ({category.shortLabel})
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1.5 text-xs">
-                {category.checklistItems.map((item) => {
+                {unitChecklistItems.map((item) => {
                   const checked = Boolean(record.checklist[item.key]);
                   return (
                     <div key={item.key} className="flex items-center gap-2 text-slate-800">
@@ -179,11 +190,11 @@ export const PrintableQcSheet: React.FC<PrintableQcSheetProps> = ({ records }) =
               )}
             </section>
 
-            {/* Footer Tanda Tangan / Paraf */}
+            {/* Footer Tanda Tangan / Approval */}
             <footer className="pt-4 mt-2 border-t border-slate-300 grid grid-cols-3 gap-6 text-xs text-slate-700">
               <div className="flex flex-col justify-between min-h-[88px]">
                 <p className="text-slate-600 leading-snug">
-                  Diperiksa Quality Control Inspection
+                  Diperiksa Oleh (QC Inspector)
                 </p>
                 <p className="font-semibold text-slate-900 border-t border-slate-400 pt-1 mt-8">
                   {record.qcName}
@@ -191,7 +202,7 @@ export const PrintableQcSheet: React.FC<PrintableQcSheetProps> = ({ records }) =
               </div>
               <div className="flex flex-col justify-between min-h-[88px]">
                 <p className="text-slate-600 leading-snug">
-                  Verifikasi Koordinator Quality Control
+                  Diverifikasi Oleh
                 </p>
                 <p className="font-medium text-slate-900 border-t border-slate-400 pt-1 mt-8">
                   Koordinator Quality Control
@@ -199,7 +210,7 @@ export const PrintableQcSheet: React.FC<PrintableQcSheetProps> = ({ records }) =
               </div>
               <div className="flex flex-col justify-between min-h-[88px]">
                 <p className="text-slate-600 leading-snug">
-                  Pengesahan Manager Quality Control
+                  Disahkan Oleh
                 </p>
                 <p className="font-medium text-slate-900 border-t border-slate-400 pt-1 mt-8">
                   Manager Quality Control
