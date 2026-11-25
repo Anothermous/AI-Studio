@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Printer, X } from 'lucide-react';
-import type { QCInspectionRecord } from '../types/qc';
+import { getCategoryConfig, type QCInspectionRecord } from '../types/qc';
 import { PrintableQcSheet } from './PrintableQcSheet';
 
 interface PrintPreviewModalProps {
@@ -8,13 +8,63 @@ interface PrintPreviewModalProps {
   onClose: () => void;
 }
 
+function sanitizeFileName(name: string): string {
+  return name
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildPdfFileName(records: QCInspectionRecord[]): string {
+  if (records.length === 0) return '';
+
+  const categoryLabels = Array.from(
+    new Set(records.map((rec) => getCategoryConfig(rec.productCategory).label))
+  );
+
+  if (records.length === 1) {
+    const rec = records[0];
+    const parts = [
+      categoryLabels[0],
+      rec.unitType?.trim(),
+      rec.barcodeUnit?.trim(),
+      rec.tagDate?.trim(),
+    ].filter(Boolean);
+    return sanitizeFileName(parts.join(' - '));
+  }
+
+  const categoryPart = categoryLabels.join(', ');
+  const uniqueDates = Array.from(
+    new Set(records.map((rec) => rec.tagDate?.trim()).filter(Boolean))
+  );
+  const dateSuffix = uniqueDates.length === 1 ? ` - ${uniqueDates[0]}` : '';
+
+  return sanitizeFileName(
+    `${categoryPart} - Finish Good QC (${records.length} Unit)${dateSuffix}`
+  );
+}
+
 export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
   records,
   onClose,
 }) => {
+  const pdfFileName = useMemo(() => buildPdfFileName(records), [records]);
+
+  useEffect(() => {
+    if (!pdfFileName) return;
+    const previousTitle = document.title;
+    document.title = pdfFileName;
+    return () => {
+      document.title = previousTitle;
+    };
+  }, [pdfFileName]);
+
   if (records.length === 0) return null;
 
   const handlePrint = () => {
+    if (pdfFileName) {
+      document.title = pdfFileName;
+    }
     window.print();
   };
 
